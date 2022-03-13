@@ -206,6 +206,24 @@ int query_in_pgtbl(void *pgtbl, vaddr_t va, paddr_t *pa, pte_t **entry)
          * return the pa and pte until a L0/L1 block or page, return
          * `-ENOMAPPING` if the va is not mapped.
          */
+        ptp_t *l1_ptp, *l2_ptp;
+        pte_t *pte;
+        int res;
+
+        // l0
+        res = get_next_ptp(pgtbl, 0, va, &l1_ptp, &pte, false);
+        if (res == -ENOMAPPING) {
+                return res;
+        }
+
+        // l1
+        res = get_next_ptp(l1_ptp, 1, va, &l2_ptp, &pte, false);
+        if (res == -ENOMAPPING) {
+                return res;
+        }
+        else if (res == BLOCK_PTP) {
+                
+        }
 
         /* LAB 2 TODO 3 END */
 }

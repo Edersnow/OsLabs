@@ -84,7 +84,32 @@ static struct page *split_page(struct phys_mem_pool *pool, u64 order,
          * Hint: Recursively put the buddy of current chunk into
          * a suitable free list.
          */
+        struct page *res = NULL;
 
+        --pool->free_lists[page->order].nr_free;
+        list_del(&(page->node));
+
+        while (page->order != order) {
+                struct page *buddy;
+
+                // split
+                --page->order;
+
+                buddy = get_buddy_chunk(pool, page);
+                buddy->order = page->order;
+                buddy->allocated = 0;
+                buddy->pool = pool;
+                init_list_head(&(buddy->node));
+
+                ++pool->free_lists[page->order].nr_free;
+                list_add(&(buddy->node), &(pool->free_lists[page->order].free_list));
+        }
+
+        page->allocated = 1;
+        res = page;
+
+        // should never be null
+        return res;
         /* LAB 2 TODO 2 END */
 }
 
@@ -95,7 +120,17 @@ struct page *buddy_get_pages(struct phys_mem_pool *pool, u64 order)
          * Hint: Find a chunk that satisfies the order requirement
          * in the free lists, then split it if necessary.
          */
+        struct page *res = NULL;
+        
+        for (u64 i = order; i < BUDDY_MAX_ORDER; ++i) {
+                if (pool->free_lists[i].nr_free) {
+                        struct list_head *to_be_split = pool->free_lists[i].free_list.next;
+                        res = split_page(pool, order, list_entry(to_be_split, struct page, node));
+                }
+        }
 
+        // nullable
+        return res;
         /* LAB 2 TODO 2 END */
 }
 
@@ -106,6 +141,29 @@ static struct page *merge_page(struct phys_mem_pool *pool, struct page *page)
          * Hint: Recursively merge current chunk with its buddy
          * if possible.
          */
+        while (true) {
+                struct page *buddy = get_buddy_chunk(pool, page);
+                if (buddy->allocated) {
+                        break;
+                }
+
+                pool->free_lists[page->order].nr_free -= 2;
+                list_del(&(page->node));
+                list_del(&(buddy->node));
+
+                // IMPORTANT
+                if (page > buddy) {
+                        page = buddy;
+                }
+
+                ++page->order;
+                page->allocated = 0;
+                init_list_head(&(page->node));
+                page->pool = pool;
+
+                ++pool->free_lists[page->order].nr_free;
+                list_add(&(page->node), &(pool->free_lists[page->order].free_list));
+        }
 
         /* LAB 2 TODO 2 END */
 }
@@ -117,6 +175,11 @@ void buddy_free_pages(struct phys_mem_pool *pool, struct page *page)
          * Hint: Merge the chunk with its buddy and put it into
          * a suitable free list.
          */
+        page->allocated = 0;
+        ++pool->free_lists[page->order].nr_free;
+        list_add(&(page->node), &(pool->free_lists[page->order].free_list));
+
+        merge_page(pool, page);
 
         /* LAB 2 TODO 2 END */
 }

@@ -46,6 +46,10 @@ void main(paddr_t boot_flag)
         lab2_test_page_table();
 #endif /* CHCORE_KERNEL_TEST */
 
+        /* reconfig kernel page table */
+        reconfig_kernel_page_table();
+        kinfo("[ChCore] reconfig kernel page table finished.\n");
+
         while (1) {
         }
 

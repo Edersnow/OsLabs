@@ -19,7 +19,7 @@
 
 #ifdef ENABLE_MEMORY_PAGE_SWITCH
 
-#define simulate_page_order 4
+#define simulate_page_order 1
 #define simulate_page_num (1 << simulate_page_order)
 
 static paddr_t simulate_pa;
@@ -73,7 +73,7 @@ static void alloc_page_in_memory(void *pgtbl, vaddr_t va, paddr_t pa, vmr_prop_t
         access_time[alloc_index] = current_time++;
 
         memcpy(phys_to_virt(simulate_pa + alloc_index * PAGE_SIZE), phys_to_virt(pa), PAGE_SIZE);
-        map_range_in_pgtbl(pgtbl, va, pa, PAGE_SIZE, perm);
+        map_range_in_pgtbl(pgtbl, va, simulate_pa + alloc_index * PAGE_SIZE, PAGE_SIZE, perm);
 }
 
 #endif

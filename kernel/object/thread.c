@@ -98,6 +98,21 @@ static u64 load_binary(struct cap_group *cap_group, struct vmspace *vmspace,
                         p_vaddr = elf->p_headers[i].p_vaddr;
                         /* LAB 3 TODO BEGIN */
 
+                        seg_map_sz = ROUND_UP(seg_sz + p_vaddr, PAGE_SIZE) - ROUND_DOWN(p_vaddr, PAGE_SIZE);
+                        pmo = obj_alloc(TYPE_PMO, sizeof(*pmo));
+
+                        memset((void*)pmo, 0, sizeof(*pmo));
+                        pmo->size = seg_map_sz;
+                        pmo->type = PMO_DATA;
+                        pmo->start = (paddr_t)virt_to_phys(kmalloc(seg_map_sz));
+                        pmo_cap[i] = cap_alloc(cap_group, pmo, 0);
+
+                        memset((void *)phys_to_virt(pmo->start), 0, pmo->size);
+                        memcpy((void *)phys_to_virt(pmo->start) + (elf->p_headers[i].p_vaddr & OFFSET_MASK), bin + elf->p_headers[i].p_offset, elf->p_headers[i].p_filesz);
+
+                        flags = PFLAGS2VMRFLAGS(elf->p_headers[i].p_flags);
+                        ret = vmspace_map_range(vmspace, ROUND_DOWN(p_vaddr, PAGE_SIZE), seg_map_sz, flags, pmo);
+
                         /* LAB 3 TODO END */
                         BUG_ON(ret != 0);
                 }
@@ -388,6 +403,8 @@ void sys_thread_exit(void)
 #endif
         /* LAB 3 TODO BEGIN */
 
+        --current_cap_group->thread_cnt;
+        
         /* LAB 3 TODO END */
         /* Reschedule */
         sched();

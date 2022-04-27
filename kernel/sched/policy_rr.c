@@ -110,13 +110,13 @@ struct thread *rr_sched_choose_thread(void)
         /* LAB 4 TODO BEGIN */
 
         u32 cpu_id = smp_get_cpu_id();
-        if (!list_empty(&(rr_ready_queue_meta[cpu_id].queue_head))) {
-                thread = list_entry(rr_ready_queue_meta[cpu_id].queue_head.next, struct thread, ready_queue_node);
-                if (thread) {
-                        if (rr_sched_dequeue(thread) == 0) {
-                                return thread;
-                        }
+        struct list_head *iter = rr_ready_queue_meta[cpu_id].queue_head.next;
+        while (iter != &rr_ready_queue_meta[cpu_id].queue_head) {
+                thread = list_entry(iter, struct thread, ready_queue_node);
+                if (rr_sched_dequeue(thread) == 0) {
+                        return thread;
                 }
+                iter = iter->next;
         }
 
         thread = &idle_threads[cpu_id];
@@ -154,7 +154,7 @@ int rr_sched(void)
 {
         /* LAB 4 TODO BEGIN */
         struct thread *cur = current_thread;
-        if (cur && cur->thread_ctx) {
+        if (cur && cur->thread_ctx && cur->thread_ctx->type != TYPE_IDLE) {
                 if (current_thread->thread_ctx->sc->budget > 0 && current_thread->thread_ctx->state != TS_WAITING && cur->thread_ctx->thread_exit_state != TE_EXITING) {
                         return 0;
                 }
@@ -164,7 +164,6 @@ int rr_sched(void)
                         cur->thread_ctx->thread_exit_state = TE_EXITED;
                 }
                 else if (cur->thread_ctx->state != TS_WAITING) {
-                        cur->thread_ctx->state = TS_INIT;
                         rr_sched_enqueue(cur);
                 }
         }

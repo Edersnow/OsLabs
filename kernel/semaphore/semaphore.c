@@ -59,7 +59,6 @@ s32 signal_sem(struct semaphore *sem)
                 list_del(&awake->sem_queue_node);
                 --sem->waiting_threads_count;
 
-                awake->thread_ctx->state = TS_INIT;
                 sched_enqueue(awake);
         }
         else {

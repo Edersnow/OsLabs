@@ -403,7 +403,8 @@ void sys_thread_exit(void)
 #endif
         /* LAB 3 TODO BEGIN */
 
-        --current_cap_group->thread_cnt;
+        current_thread->thread_ctx->state = TS_EXIT;
+        current_thread = NULL;
         
         /* LAB 3 TODO END */
         /* Reschedule */

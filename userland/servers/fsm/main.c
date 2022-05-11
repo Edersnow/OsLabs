@@ -78,7 +78,174 @@ void strip_path(struct mount_point_info_node *mpinfo, char* path) {
 
 /* You could add new functions here as you want. */
 /* LAB 5 TODO BEGIN */
+void forward_ipc(struct mount_point_info_node *mpinfo, struct ipc_msg *ipc_msg, struct ipc_msg* ipc_msg_forward) {
+	int ret;
 
+	ipc_msg_forward->cap_slot_number = 1;
+	ipc_set_msg_cap(ipc_msg_forward, 0, mpinfo->fs_cap);
+	ret = ipc_call(mpinfo->_fs_ipc_struct, ipc_msg_forward);
+	ipc_set_msg_data(ipc_msg, ipc_get_msg_data(ipc_msg_forward), 0, ret);
+	ipc_destroy_msg(mpinfo->_fs_ipc_struct, ipc_msg_forward);
+}
+
+void create_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->creat.pathname, strlen(fr->creat.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_CREAT;
+	fr_forward->creat.mode = fr->creat.mode;
+	strcpy(fr_forward->creat.pathname, fr->creat.pathname);
+	strip_path(mpinfo, fr_forward->creat.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void open_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->open.pathname, strlen(fr->open.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_OPEN;
+	fr_forward->open.new_fd = fr->open.new_fd;
+	fr_forward->open.mode = fr->open.mode;
+	fr_forward->open.flags = fr->open.flags;
+	fr_forward->open.fid = fr->open.fid;
+	strcpy(fr_forward->open.pathname, fr->open.pathname);
+	strip_path(mpinfo, fr_forward->open.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+	fsm_set_mount_info_withfd(client_badge, fr->open.new_fd, mpinfo);
+}
+
+void read_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = fsm_get_mount_info_withfd(client_badge, fr->read.fd);
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_READ;
+	fr_forward->read.fd = fr->read.fd;
+	fr_forward->read.count = fr->read.count;
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void write_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = fsm_get_mount_info_withfd(client_badge, fr->write.fd);
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request) + fr->write.count + 1, 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_WRITE;
+	fr_forward->write.fd = fr->write.fd;
+	fr_forward->write.count = fr->write.count;
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void unlink_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->unlink.pathname, strlen(fr->unlink.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_UNLINK;
+	fr_forward->unlink.flags = fr->unlink.flags;
+	strcpy(fr_forward->unlink.pathname, fr->unlink.pathname);
+	strip_path(mpinfo, fr_forward->unlink.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void rmdir_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->rmdir.pathname, strlen(fr->rmdir.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_RMDIR;
+	fr_forward->rmdir.flags = fr->rmdir.flags;
+	strcpy(fr_forward->rmdir.pathname, fr->rmdir.pathname);
+	strip_path(mpinfo, fr_forward->rmdir.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void mkdir_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->mkdir.pathname, strlen(fr->mkdir.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_MKDIR;
+	fr_forward->mkdir.mode = fr->mkdir.mode;
+	strcpy(fr_forward->mkdir.pathname, fr->mkdir.pathname);
+	strip_path(mpinfo, fr_forward->mkdir.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void close_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = fsm_get_mount_info_withfd(client_badge, fr->close.fd);
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_CLOSE;
+	fr_forward->close.fd = fr->close.fd;
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void get_size_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = get_mount_point(fr->getsize.pathname, strlen(fr->getsize.pathname));
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_GET_SIZE;
+	strcpy(fr_forward->getsize.pathname, fr->getsize.pathname);
+	strip_path(mpinfo, fr_forward->getsize.pathname);
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
+
+void lseek_forward(struct mount_point_info_node *mpinfo, struct fs_request *fr, struct ipc_msg *ipc_msg, u64 client_badge) {
+	struct ipc_msg *ipc_msg_forward;
+	struct fs_request *fr_forward;
+
+	mpinfo = fsm_get_mount_info_withfd(client_badge, fr->lseek.fd);
+	ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+	fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+
+	fr_forward->req = FS_REQ_LSEEK;
+	fr_forward->lseek.fd = fr->lseek.fd;
+	fr_forward->lseek.offset = fr->lseek.offset;
+	fr_forward->lseek.whence = fr->lseek.whence;
+
+	forward_ipc(mpinfo, ipc_msg, ipc_msg_forward);
+}
 /* LAB 5 TODO END */
 
 
@@ -92,7 +259,8 @@ void fsm_server_dispatch(struct ipc_msg *ipc_msg, u64 client_badge)
 
 	/* You could add code here as you want.*/
 	/* LAB 5 TODO BEGIN */
-
+	struct ipc_msg* ipc_msg_forward;
+	struct fs_request *fr_forward;
 	/* LAB 5 TODO END */
 
 	spinlock_lock(&fsmlock);
@@ -113,7 +281,63 @@ void fsm_server_dispatch(struct ipc_msg *ipc_msg, u64 client_badge)
 			break;
 
 		/* LAB 5 TODO BEGIN */
+		case FS_REQ_CREAT:
+			create_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
 
+		case FS_REQ_OPEN:
+			open_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_WRITE:
+			write_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_READ:
+			read_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_UNLINK:
+			unlink_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_RMDIR:
+			rmdir_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_MKDIR:
+			mkdir_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_CLOSE:
+			close_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_GET_SIZE:
+			get_size_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+
+		case FS_REQ_LSEEK:
+			lseek_forward(mpinfo, fr, ipc_msg, client_badge);
+			break;
+		
+		case FS_REQ_GETDENTS64: 
+			mpinfo = fsm_get_mount_info_withfd(client_badge, fr->getdents64.fd);
+
+			ipc_msg_forward = ipc_create_msg(mpinfo->_fs_ipc_struct, sizeof(struct fs_request), 0);
+			chcore_assert(ipc_msg_forward);
+			fr_forward = (struct fs_request *) ipc_get_msg_data(ipc_msg_forward);
+			
+			fr_forward->req = FS_REQ_GETDENTS64;
+			fr_forward->getdents64.fd = fr->getdents64.fd;
+			fr_forward->getdents64.count = fr->getdents64.count;
+
+			ipc_msg_forward->cap_slot_number = 1;
+			ipc_set_msg_cap(ipc_msg_forward, 0, mpinfo->fs_cap);
+			ret = ipc_call(mpinfo->_fs_ipc_struct, ipc_msg_forward);
+			ipc_set_msg_data(ipc_msg, ipc_get_msg_data(ipc_msg_forward), 0, ret);
+			ipc_destroy_msg(mpinfo->_fs_ipc_struct, ipc_msg_forward);
+			break;
 		/* LAB 5 TODO END */
 
 		default:
